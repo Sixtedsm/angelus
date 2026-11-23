@@ -101,7 +101,17 @@ h2 { font: 600 12px/1 var(--sans); text-transform: uppercase; letter-spacing: .0
 dialog { border: 0; padding: 0; width: 100%; max-width: 560px; max-height: 92dvh; margin: auto auto 0; border-radius: 22px 22px 0 0; background: var(--bg); color: var(--fg); }
 @media (min-width: 640px) { dialog { margin: auto; border-radius: 22px; } }
 dialog::backdrop { background: rgba(6, 18, 12, .55); }
+dialog { overflow: hidden; overscroll-behavior: contain; }
+html:has(dialog[open]) { overflow: hidden; }
 .sheet { display: flex; flex-direction: column; max-height: 92dvh; }
+.sheet-body { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* Téléphone : chaque fenêtre occupe tout l'écran, fixe, sans rebond ni bord blanc */
+@media (max-width: 639px) {
+  dialog[open] { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border-radius: 0; }
+  .sheet { height: 100%; max-height: none; }
+  .sheet-head { padding-top: calc(12px + env(safe-area-inset-top)); }
+  .sheet-body { flex: 1; }
+}
 .sheet-head { display: flex; align-items: center; padding: 12px 12px 4px 20px; }
 .sheet-head h3 { font: 600 24px/1.1 var(--serif); margin: 0; }
 .sheet-body { overflow: auto; padding: 8px 20px 20px; }
@@ -465,60 +475,75 @@ function ofDay(cat, d, info) {
 const trackFor = (a, d, info) => (a.track !== 'auto' && byId(a.track) && !byId(a.track).pending && byId(a.track)) || ofDay(a.cat, d, info);
 
 /* ---------- Son ---------- */
+// Lecture directe par l'élément audio (pas de Web Audio) : c'est ce qui marche le plus sûrement sur iPhone,
+// y compris en mode silencieux. L'iPhone ignore le réglage de volume : on y remplace le fondu par une pause.
 const player = new Audio();
-player.crossOrigin = 'anonymous';
 player.preload = 'auto';
-let ctx, gain, bellTimer, prepared = null, nowPlaying = null, ringing = null, readTok = 0, primed = false, wake = null;
-function audio() {
-  if (!ctx) {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-    gain = ctx.createGain(); gain.gain.value = 0;
-    ctx.createMediaElementSource(player).connect(gain);
-    gain.connect(ctx.destination);
-  }
-  if (ctx.state !== 'running') ctx.resume();
-  return ctx;
+player.setAttribute('playsinline', '');
+const FIXED_VOL = (() => { const a = new Audio(); a.volume = 0.5; return a.volume !== 0.5; })(); // vrai sur iPhone
+let ctx = null, bellGain = null, bellTimer, fadeTimer, prepared = null, nowPlaying = null, ringing = null, readTok = 0, primed = false, wake = null;
+const setVol = v => { if (!FIXED_VOL) player.volume = Math.max(0, Math.min(1, v)); };
+function fadeTo(target, secs) {
+  clearInterval(fadeTimer);
+  if (FIXED_VOL || !secs) return setVol(target);
+  const from = player.volume, t0 = Date.now();
+  fadeTimer = setInterval(() => {
+    const k = Math.min(1, (Date.now() - t0) / (secs * 1000));
+    setVol(from + (target - from) * k * k);
+    if (k >= 1) clearInterval(fadeTimer);
+  }, 100);
 }
-// À appeler pendant un geste : iOS n'autorise ensuite le son et la voix sans toucher l'écran.
+// À appeler pendant un toucher : l'iPhone autorise ensuite le son et la voix sans nouveau toucher.
 function unlock(src) {
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
-  audio();
+  try { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); } catch {}
   if (!primed && 'speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); primed = true; }
-  if (src && player.paused && !nowPlaying) { player.src = src; player.play().then(() => { if (!nowPlaying) player.pause(); }).catch(() => {}); }
-}
-document.addEventListener('pointerdown', () => unlock(), { once: true });
-const hold = (p, t) => p.cancelAndHoldAtTime ? p.cancelAndHoldAtTime(t) : (p.cancelScheduledValues(t), p.setValueAtTime(p.value, t));
-
-async function srcFor(t) {
-  if (t.user) {
-    const r = 'caches' in window && await (await caches.open('angelus-user')).match('user/' + t.id);
-    return r ? URL.createObjectURL(await r.blob()) : null;
+  if (src && player.paused && !nowPlaying) {
+    player.muted = true; player.src = src;
+    player.play().then(() => { if (!nowPlaying) player.pause(); }).catch(() => {});
   }
-  return prepared && prepared.id === t.id ? prepared.url : t.url;
 }
-async function play(t, { fade = 0, loop = true } = {}) {
-  stopSound(); audio();
+document.addEventListener('click', () => unlock(), { once: true });
+
+async function userSrc(t) {
+  const r = 'caches' in window && await (await caches.open('angelus-user')).match('user/' + t.id);
+  return r ? URL.createObjectURL(await r.blob()) : null;
+}
+// Sans attente avant player.play() : sinon l'iPhone ne relie plus la lecture au toucher et refuse le son.
+function play(t, { fade = 0, loop = true } = {}) {
+  stopSound();
   nowPlaying = t.id; paintPlay();
-  const src = await srcFor(t).catch(() => null);
   // null = remplacé par une autre lecture ; false = échec réel
   const fail = () => { if (nowPlaying !== t.id) return null; nowPlaying = null; paintPlay(); return false; };
-  if (!src || nowPlaying !== t.id) return fail();
-  player.loop = loop; player.src = src;
-  const g = gain.gain, n = ctx.currentTime;
-  g.cancelScheduledValues(n); g.setValueAtTime(fade ? 0.03 : 1, n); // départ doux mais audible
-  if (fade) g.exponentialRampToValueAtTime(1, n + fade);
-  try { await player.play(); return true; } catch { return fail(); }
+  const go = src => {
+    if (!src || nowPlaying !== t.id) return fail();
+    player.loop = loop; player.muted = false; player.src = src;
+    setVol(fade ? 0.05 : 1);
+    const p = player.play();
+    fadeTo(1, fade);
+    return p.then(() => true, fail);
+  };
+  if (!t.user) return go(prepared && prepared.id === t.id ? prepared.url : t.url);
+  player.muted = true; player.play().catch(() => {}); // garde le toucher pendant la lecture du fichier
+  return userSrc(t).then(go, fail);
 }
 function stopSound() {
   nowPlaying = null; player.pause();
-  clearInterval(bellTimer); bellTimer = null;
-  if (gain) { gain.gain.cancelScheduledValues(ctx.currentTime); gain.gain.value = 0; }
+  clearInterval(fadeTimer); clearInterval(bellTimer); bellTimer = null;
   paintPlay();
 }
-function duck(on) { if (!gain) return; const n = ctx.currentTime; hold(gain.gain, n); gain.gain.setTargetAtTime(on ? 0.15 : 1, n, 0.7); }
+function duck(on) {
+  if (bellGain && nowPlaying === 'bell') { bellGain.gain.value = on ? 0.15 : 1; return; }
+  if (!FIXED_VOL) return fadeTo(on ? 0.15 : 1, 1.5);
+  // iPhone : le chant se tait pendant la lecture, puis reprend
+  if (on) player.pause(); else if (ringing && nowPlaying) player.play().catch(() => {});
+}
 // Secours si le chant ne se charge pas : une cloche douce, synthétisée sur place.
 function bell() {
-  audio(); stopSound(); nowPlaying = 'bell'; gain.gain.value = 1;
+  stopSound();
+  try { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); } catch { return; }
+  if (!bellGain) { bellGain = ctx.createGain(); bellGain.connect(ctx.destination); }
+  bellGain.gain.value = 1; nowPlaying = 'bell';
   const strike = () => {
     const t0 = ctx.currentTime;
     [0.5, 1, 1.19, 1.56, 2, 2.74, 3.76].forEach((r, i) => {
@@ -527,7 +552,7 @@ function bell() {
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(0.22 / (1 + i * 0.6), t0 + 0.015);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + 4);
-      o.connect(g); g.connect(gain); o.start(t0); o.stop(t0 + 4.1);
+      o.connect(g); g.connect(bellGain); o.start(t0); o.stop(t0 + 4.1);
     });
   };
   strike(); bellTimer = setInterval(strike, 3200);
@@ -619,7 +644,7 @@ async function ring(a, { preview = false } = {}) {
   tick(); keepAwake();
   const ok = await play(t, { fade: preview ? 0 : S.set.fade });
   if (ok === false && ringing === a) bell();
-  if (ctx.state !== 'running') $('#rLabel').textContent = 'Touchez l’écran pour lancer le chant';
+  if (player.paused && nowPlaying && nowPlaying !== 'bell') $('#rLabel').textContent = 'Touchez l’écran pour lancer le chant';
   if (!a.gospel) return;
   if (!day) day = await getDay(date).catch(() => null);
   if (ringing !== a) return;
@@ -641,9 +666,9 @@ function stopRing() {
   render();
 }
 // Si le téléphone a bloqué le son (aucun toucher avant), un toucher sur l'écran de réveil le relance.
-$('#ring').addEventListener('pointerdown', () => {
+$('#ring').addEventListener('click', () => {
   unlock();
-  if (ringing && nowPlaying && nowPlaying !== 'bell' && player.paused) player.play().catch(() => {});
+  if (ringing && nowPlaying && nowPlaying !== 'bell' && player.paused && !speechSynthesis.speaking) { player.muted = false; player.play().catch(() => {}); }
 });
 $('#stop').onclick = () => { if (S.snooze && ringing && S.snooze.id === ringing.id) S.snooze = null; save(); stopRing(); };
 $('#snooze').onclick = () => {
