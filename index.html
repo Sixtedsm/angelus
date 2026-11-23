@@ -108,8 +108,9 @@ dialog::backdrop { background: rgba(6, 18, 12, .55); }
 .sheet-foot { display: flex; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .sheet-body h4 { font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 26px 0 10px; }
 .sheet-body h4:first-child { margin-top: 8px; }
-.timein { display: block; width: 100%; font: 500 64px/1 var(--serif); text-align: center; border: 0; border-radius: 18px; background: var(--surface); padding: 10px 12px; min-height: 92px; cursor: pointer; }
-.timein::-webkit-calendar-picker-indicator { display: none; }
+.timein { display: block; width: 100%; font: 500 64px/1 var(--serif); text-align: center; border: 0; border-radius: 18px; background: var(--surface); padding: 10px 12px; min-height: 92px; cursor: pointer; position: relative; }
+/* tout le champ ouvre le sélecteur natif (icône invisible étendue à tout le champ) */
+.timein::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: auto; height: auto; opacity: 0; cursor: pointer; }
 .field { display: grid; gap: 8px; margin: 18px 0; }
 .lab { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; }
 .text { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 12px 14px; min-height: 48px; }
@@ -284,6 +285,14 @@ summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
       <div class="field"><label class="lab" for="sSnooze">Répétition</label>
         <select id="sSnooze" class="text"><option value="5">5 minutes</option><option value="9">9 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
 
+      <h4>iPhone : sonner même verrouillé</h4>
+      <ol class="steps">
+        <li><b>Horloge</b> › Alarmes › + : choisis l’heure, nomme l’alarme « Angélus ». Dans Sonnerie, « Choisir un morceau » permet de prendre un chant de ta bibliothèque Musique.</li>
+        <li><b>Raccourcis</b> › Automatisation › + › <b>Alarme</b> › « Est arrêtée » › alarme Angélus › <b>Exécuter immédiatement</b>.</li>
+        <li>Ajoute l’action <b>Ouvrir les URL</b> avec : <span id="matinUrl" style="user-select:all;word-break:break-all;color:var(--accent)"></span></li>
+        <li>Le matin, l’alarme sonne même téléphone verrouillé. Arrête-la et déverrouille : Angélus s’ouvre, touche « Commencer ».</li>
+      </ol>
+
       <h4 id="howto">Installer sur le téléphone</h4>
       <ol class="steps">
         <li><b>iPhone</b> : ouvrez cette page dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».</li>
@@ -320,6 +329,15 @@ summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
       <button class="btn outline" id="snooze">Répéter</button>
       <button class="btn white" id="stop">Arrêter</button>
     </div>
+  </div>
+</div>
+
+<div class="ring" id="matin" hidden>
+  <div class="ring-in" style="justify-content:center;align-items:center;text-align:center;gap:20px">
+    <svg class="emb" aria-hidden="true"><use href="#emblem"/></svg>
+    <div class="clock" id="mClock"></div>
+    <p class="rnow" style="margin:0">Bonjour. Voici le chant et l’Évangile du jour.</p>
+    <button class="btn white" id="mStart" style="flex:none;width:100%;min-height:62px;font-size:17px">Commencer</button>
   </div>
 </div>
 
@@ -636,7 +654,7 @@ $('#snooze').onclick = () => {
 
 function tick() {
   const now = new Date(), hm = hhmm(now.getHours(), now.getMinutes());
-  $('#nClock').textContent = hm; $('#rClock').textContent = hm;
+  $('#nClock').textContent = hm; $('#rClock').textContent = hm; $('#mClock').textContent = hm;
   if (hm !== tick.hm) { tick.hm = hm; renderNext(); }
   if (ymd(now) !== tick.dd) { if (tick.dd) loadToday(); tick.dd = ymd(now); }
   if (ringing) return;
@@ -678,6 +696,18 @@ async function prepare(n) {
     prepared = { id: t.id, url: URL.createObjectURL(b) };
   } catch {}
 }
+
+/* ---------- Écran du matin : ouvert par l'automatisation iPhone (…/#matin) après l'alarme de l'Horloge ---------- */
+// Safari exige un toucher avant tout son : d'où le bouton « Commencer ».
+const showMatin = () => { if (location.hash === '#matin') { $('#matin').hidden = false; tick(); } };
+addEventListener('hashchange', showMatin);
+$('#mStart').onclick = () => {
+  $('#matin').hidden = true;
+  history.replaceState(null, '', location.pathname);
+  unlock();
+  const a = S.alarms.find(x => x.on) || { cat: 'greg', track: 'auto', gospel: true };
+  ring({ id: 'matin', cat: a.cat, track: a.track, gospel: a.gospel, label: 'Bonjour' }, { preview: true });
+};
 
 /* ---------- Écran principal ---------- */
 function soundLine(a) {
@@ -753,7 +783,6 @@ function openEditor(id) {
 function paintDays() {
   $('#eDays').innerHTML = WEEK.map(d => `<button type="button" data-d="${d}" aria-pressed="${edit.days.includes(d)}" aria-label="${DFULL[d]}">${DL[d]}</button>`).join('');
 }
-$('#eTime').onclick = e => { try { e.target.showPicker(); } catch {} };
 $('#eDays').onclick = e => {
   const b = e.target.closest('[data-d]'); if (!b) return;
   const d = +b.dataset.d;
@@ -870,7 +899,8 @@ $('#installBtn').onclick = () => {
 };
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
-render(); loadToday(); tick();
+$('#matinUrl').textContent = location.origin + location.pathname + '#matin';
+render(); loadToday(); tick(); showMatin();
 setInterval(tick, 1000);
 </script>
 </body>
