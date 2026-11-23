@@ -6,7 +6,7 @@ Lancé chaque nuit par GitHub (.github/workflows/site.yml). Voix : edge-tts, gra
 import asyncio, datetime, html, json, pathlib, re, sys, urllib.request
 import edge_tts
 
-VOICE, RATE, PITCH = 'fr-FR-HenriNeural', '-10%', '-3Hz'  # voix d'homme posée ; ralentie et un peu plus grave
+VOICE, RATE, PITCH = 'fr-FR-RemyMultilingualNeural', '-10%', '+0Hz'  # Rémy : voix d'homme la plus naturelle, ralentie pour la lecture
 
 
 def gospel_text(date):
