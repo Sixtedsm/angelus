@@ -283,10 +283,12 @@ summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
     <div class="sheet-head"><h3 id="sTitle">Réglages</h3><button class="icon-btn" data-close aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <div class="sheet-body">
       <h4>Voix de lecture</h4>
-      <div class="field"><label class="lab" for="sVoice">Voix</label><select id="sVoice" class="text"></select></div>
+      <p class="hint" style="margin-top:0">L’Évangile est lu par une voix enregistrée chaque nuit, proche d’un lecteur humain.</p>
+      <button type="button" class="btn ghost" id="sTest" style="width:100%;margin-top:12px">Écouter l’Évangile du jour</button>
+      <h4>Voix de secours (sans connexion)</h4>
+      <div class="field"><label class="lab" for="sVoice">Voix du téléphone</label><select id="sVoice" class="text"></select></div>
       <div class="field"><label class="lab" for="sRate">Débit</label><input type="range" id="sRate" min="0.7" max="1.1" step="0.02"><div class="scale"><span>Posé</span><span>Vif</span></div></div>
       <div class="field"><label class="lab" for="sPitch">Timbre</label><input type="range" id="sPitch" min="0.6" max="1.2" step="0.02"><div class="scale"><span>Grave</span><span>Clair</span></div></div>
-      <button type="button" class="btn ghost" id="sTest" style="width:100%">Écouter un extrait</button>
       <p class="hint">Pour une voix plus humaine, gratuite : sur iPhone, Réglages › Accessibilité › Contenu énoncé › Voix › Français, puis téléchargez une voix « améliorée » ou « premium ». Sur Android, Paramètres › Synthèse vocale › Google, voix française haute qualité.</p>
 
       <h4>Sonnerie</h4>
@@ -335,6 +337,7 @@ summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
     <p class="rnow" id="rNow"></p>
     <p class="rlitu" id="rLitu"></p>
     <article class="gospel" id="rGospel"></article>
+    <button class="btn outline" id="rListen" style="flex:none;margin-bottom:12px" hidden>Toucher pour entendre l’Évangile</button>
     <div class="ring-actions">
       <button class="btn outline" id="snooze">Répéter</button>
       <button class="btn white" id="stop">Arrêter</button>
@@ -584,8 +587,11 @@ function speak(text) {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'fr-FR'; const v = pickVoice(); if (v) u.voice = v;
     u.rate = S.set.rate; u.pitch = S.set.pitch;
-    const done = () => { clearTimeout(t); res(); };
+    // renvoie true si la voix a vraiment démarré (l'iPhone peut la refuser sans prévenir)
+    let started = false;
+    const done = () => { clearTimeout(t); res(started); };
     const t = setTimeout(done, 4000 + text.length * 110 / S.set.rate); // certains navigateurs oublient "onend"
+    u.onstart = () => { started = true; };
     u.onend = u.onerror = done;
     window.__utt = u; // iOS perd parfois l'énoncé s'il n'est plus référencé
     speechSynthesis.speak(u);
@@ -605,22 +611,60 @@ function renderGospel(el, ev) {
     gospelParts(ev).map(ss => '<p>' + ss.map(s => `<span data-i="${i++}">${esc(s)}</span>`).join(' ') + '</p>').join('') +
     '<p class="accl">— Acclamons la Parole de Dieu.</p>';
 }
-async function readGospel(ev, el) {
+// Voix enregistrée chaque nuit par GitHub (tools/evangile.py) ; la voix du téléphone ne sert qu'en secours.
+const voiceEl = new Audio();
+voiceEl.preload = 'auto';
+voiceEl.setAttribute('playsinline', '');
+let preparedVoice = null;
+const voiceUrl = date => preparedVoice && preparedVoice.date === date ? preparedVoice.url : `audio/evangile/${date}.mp3`;
+// À appeler pendant un toucher : l'iPhone acceptera ensuite de lancer la voix seul, au réveil.
+function unlockVoice(date) {
+  if (!voiceEl.paused) return;
+  voiceEl.muted = true; voiceEl.src = voiceUrl(date);
+  voiceEl.play().then(() => { if (voiceEl.muted) voiceEl.pause(); }).catch(() => {});
+}
+function mark(el, i) {
+  el.querySelectorAll('.cur').forEach(x => x.classList.remove('cur'));
+  const sp = i != null && i >= 0 && el.querySelector(`[data-i="${i}"]`);
+  if (sp) { sp.classList.add('cur'); sp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+// Lit le fichier audio du jour ; le surlignage suit la lecture au prorata du texte. Renvoie false si pas de fichier.
+function readAudio(date, el, tok) {
+  return new Promise(res => {
+    const v = voiceEl, w = [...el.querySelectorAll('[data-i]')].map(s => s.textContent.length);
+    const intro = 60, total = w.reduce((a, b) => a + b, 0) + intro + 40;
+    const end = ok => { v.ontimeupdate = v.onended = null; if (tok === readTok) mark(el, -1); res(ok); };
+    v.ontimeupdate = () => {
+      if (tok !== readTok || !v.duration) return;
+      let pos = v.currentTime / v.duration * total - intro, i = 0;
+      if (pos < 0) return mark(el, -1);
+      while (i < w.length - 1 && pos > w[i]) pos -= w[i++];
+      if (!el.querySelector(`[data-i="${i}"].cur`)) mark(el, i);
+    };
+    v.onended = () => end(true);
+    v.loop = false; v.muted = false; v.src = voiceUrl(date); v.currentTime = 0;
+    v.play().catch(() => end(false));
+  });
+}
+async function readGospel(ev, el, date) {
   const tok = ++readTok;
+  if (date && await readAudio(date, el, tok)) return;
+  if (tok !== readTok) return;
   const say = async (text, pause, i) => {
     if (tok !== readTok) return false;
-    el.querySelectorAll('.cur').forEach(x => x.classList.remove('cur'));
-    const sp = i != null && el.querySelector(`[data-i="${i}"]`);
-    if (sp) { sp.classList.add('cur'); sp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    mark(el, i);
     await speak(text); await sleep(pause);
     return tok === readTok;
   };
-  if (!await say(ev.intro || 'Évangile de Jésus Christ', 1100)) return;
+  const heard = await speak(ev.intro || 'Évangile de Jésus Christ');
+  if (tok !== readTok) return;
+  if (!heard) { $('#rListen').hidden = false; return; } // voix bloquée : on propose un toucher
+  await sleep(1100);
   let i = 0;
   for (const ss of gospelParts(ev)) for (let k = 0; k < ss.length; k++) if (!await say(ss[k], k === ss.length - 1 ? 800 : 320, i++)) return;
   await sleep(500);
   await say('Acclamons la Parole de Dieu.', 0);
-  el.querySelectorAll('.cur').forEach(x => x.classList.remove('cur'));
+  mark(el, -1);
 }
 
 /* ---------- Sonnerie ---------- */
@@ -628,16 +672,18 @@ async function keepAwake() { try { if (!wake && navigator.wakeLock) { wake = awa
 function releaseWake() { try { wake && wake.release(); } catch {} wake = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (ringing || !$('#night').hidden)) keepAwake(); });
 
+let ringEv = null, ringDate = null;
 async function ring(a, { preview = false } = {}) {
   if (ringing) return;
   ringing = a;
   const now = new Date(), date = ymd(now);
   let day = cachedDay(date);
   const t = trackFor(a, now, day && day.info);
+  if (a.gospel) unlockVoice(date);
   $('#rLabel').textContent = preview ? 'Évangile du jour' : (a.label || 'Bonjour');
   $('#rNow').textContent = `${t.t} — ${t.sub}`;
   $('#rLitu').textContent = day ? litu(day.info) : '';
-  $('#rGospel').innerHTML = '';
+  $('#rGospel').innerHTML = ''; $('#rListen').hidden = true; ringEv = null; ringDate = date;
   $('#snooze').hidden = preview;
   $('#snooze').textContent = `Répéter · ${S.set.snooze} min`;
   $('#ring').hidden = false;
@@ -651,24 +697,35 @@ async function ring(a, { preview = false } = {}) {
   if (!day || !day.ev) { $('#rGospel').innerHTML = '<p class="ref">Évangile indisponible sans connexion</p>'; return; }
   $('#rLitu').textContent = litu(day.info);
   renderGospel($('#rGospel'), day.ev);
+  ringEv = day.ev;
   await sleep(preview ? 2500 : 9000); // le chant s'installe avant la lecture
   if (ringing !== a) return;
   duck(true);
-  await readGospel(day.ev, $('#rGospel'));
-  if (ringing === a) duck(false);
+  await readGospel(day.ev, $('#rGospel'), date);
+  if (ringing === a && $('#rListen').hidden) duck(false);
 }
 function stopRing() {
   ringing = null; readTok++;
   try { speechSynthesis.cancel(); } catch {}
+  voiceEl.pause();
   stopSound();
   $('#ring').hidden = true;
   if ($('#night').hidden) releaseWake();
   render();
 }
-// Si le téléphone a bloqué le son (aucun toucher avant), un toucher sur l'écran de réveil le relance.
+// Si le téléphone a bloqué la voix, ce toucher l'autorise : on relit l'Évangile depuis le début, chant en fond.
+$('#rListen').onclick = e => {
+  e.stopPropagation();
+  $('#rListen').hidden = true;
+  try { speechSynthesis.cancel(); } catch {}
+  const a = ringing; if (!a || !ringEv) return;
+  duck(true);
+  readGospel(ringEv, $('#rGospel'), ringDate).then(() => { if (ringing === a && $('#rListen').hidden) duck(false); });
+};
+// Si le téléphone a bloqué le chant (aucun toucher avant), un toucher sur l'écran de réveil le relance.
 $('#ring').addEventListener('click', () => {
   unlock();
-  if (ringing && nowPlaying && nowPlaying !== 'bell' && player.paused && !speechSynthesis.speaking) { player.muted = false; player.play().catch(() => {}); }
+  if (ringing && nowPlaying && nowPlaying !== 'bell' && player.paused && voiceEl.paused && !speechSynthesis.speaking) { player.muted = false; player.play().catch(() => {}); }
 });
 $('#stop').onclick = () => { if (S.snooze && ringing && S.snooze.id === ringing.id) S.snooze = null; save(); stopRing(); };
 $('#snooze').onclick = () => {
@@ -706,13 +763,22 @@ $('#nightBtn').onclick = () => {
   const n = nextAlarm();
   const t = n && trackFor(n.a, n.at, (cachedDay(ymd(n.at)) || {}).info);
   unlock(t && !t.user ? t.url : CHANTS[0].url);
+  if (n) unlockVoice(ymd(n.at));
+  // Une vraie phrase dite pendant le toucher : la voix de secours du téléphone sera autorisée au réveil.
+  try { speechSynthesis.cancel(); } catch {}
+  speak('Bonne nuit.');
   $('#night').hidden = false; keepAwake(); renderNext(); prepare(n);
 };
 $('#nExit').onclick = () => { $('#night').hidden = true; if (!ringing) releaseWake(); };
-// Télécharge à l'avance l'évangile et le chant du prochain réveil : rien ne dépend du réseau au moment de sonner.
+// Télécharge à l'avance l'Évangile (texte et voix) et le chant du prochain réveil : rien ne dépend du réseau au moment de sonner.
 async function prepare(n) {
   if (!n) return;
-  const day = await getDay(ymd(n.at)).catch(() => null);
+  const date = ymd(n.at);
+  const day = await getDay(date).catch(() => null);
+  try {
+    const r = await fetch(`audio/evangile/${date}.mp3`);
+    if (r.ok) { if (preparedVoice) URL.revokeObjectURL(preparedVoice.url); preparedVoice = { date, url: URL.createObjectURL(await r.blob()) }; }
+  } catch {}
   const t = trackFor(n.a, n.at, day && day.info);
   if (t.user || (prepared && prepared.id === t.id)) return;
   try {
@@ -838,6 +904,7 @@ $('#eSave').onclick = () => {
   save(); render(); $('#edit').close();
   const t = trackFor(edit, nextFire(edit), null);
   unlock(t.user ? null : t.url);
+  if (edit.gospel) unlockVoice(ymd(nextFire(edit)));
   toast(`Réveil réglé · dans ${inWords(nextFire(edit) - new Date())}.`);
 };
 $('#eDelete').onclick = () => {
@@ -895,7 +962,12 @@ $('#sRate').oninput = e => { S.set.rate = +e.target.value; save(); };
 $('#sPitch').oninput = e => { S.set.pitch = +e.target.value; save(); };
 $('#sFade').onchange = e => { S.set.fade = +e.target.value; save(); };
 $('#sSnooze').onchange = e => { S.set.snooze = +e.target.value; save(); };
-$('#sTest').onclick = () => { try { speechSynthesis.cancel(); } catch {} speak('Évangile de Jésus Christ selon saint Jean. Au commencement était le Verbe, et le Verbe était auprès de Dieu, et le Verbe était Dieu.'); };
+// Fait entendre la voix enregistrée de l'Évangile du jour ; à défaut, la voix du téléphone.
+$('#sTest').onclick = () => {
+  try { speechSynthesis.cancel(); } catch {}
+  voiceEl.onended = voiceEl.ontimeupdate = null; voiceEl.muted = false; voiceEl.src = voiceUrl(ymd(new Date())); voiceEl.currentTime = 0;
+  voiceEl.play().catch(() => speak('Évangile de Jésus Christ selon saint Jean. Au commencement était le Verbe, et le Verbe était auprès de Dieu, et le Verbe était Dieu.'));
+};
 
 /* ---------- Commun ---------- */
 document.addEventListener('click', e => {
@@ -906,7 +978,7 @@ document.addEventListener('click', e => {
 });
 document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('click', e => { if (e.target === d) d.close(); });
-  d.addEventListener('close', () => { if (!ringing) { stopSound(); try { speechSynthesis.cancel(); } catch {} } });
+  d.addEventListener('close', () => { if (!ringing) { stopSound(); voiceEl.pause(); try { speechSynthesis.cancel(); } catch {} } });
 });
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
