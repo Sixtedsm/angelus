@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Angélus</title>
+<meta name="description" content="Réveil catholique : chant grégorien du jour, cantiques et Évangile du jour lu à voix posée.">
+<meta name="theme-color" content="#1E4B39">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Angélus">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Une colonne de 560px : bandeau sapin en tête (le logo y vit en blanc), contenu blanc, barre d'action fixe en bas. */
+:root {
+  --sapin: #1E4B39; --sapin-deep: #153728; --on-sapin: #FFFFFF; --on-sapin-muted: #BCD2C6;
+  --bg: #FFFFFF; --surface: #F1F6F3; --line: #DCE6E0; --fg: #13251C; --muted: #5A6D63;
+  --accent: #1E4B39; --switch-on: #1E4B39; --danger: #A3352A;
+  --serif: 'Cormorant Garamond', 'EB Garamond', Georgia, 'Times New Roman', serif;
+  --sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0C1611; --surface: #14231B; --line: #23362B; --fg: #E9F1EC; --muted: #93A89C;
+    --accent: #8FC6A9; --switch-on: #3E8B66; --danger: #E5958A; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.45 var(--sans); -webkit-font-smoothing: antialiased; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+svg.i { width: 22px; height: 22px; flex: none; }
+
+/* Bandeau */
+.top { background: var(--sapin); color: var(--on-sapin); padding-top: calc(env(safe-area-inset-top) + 14px); padding-bottom: 22px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .emb { width: 42px; height: 42px; color: #fff; --pivot: var(--sapin); }
+h1 { font: 600 32px/1 var(--serif); letter-spacing: .01em; margin: 0; }
+.icon-btn { margin-left: auto; background: none; border: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+.top .icon-btn:hover { background: rgba(255,255,255,.1); }
+.litu { display: flex; gap: 9px; align-items: flex-start; margin: 18px 0 0; font-size: 15px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 6px; box-shadow: 0 0 0 2px rgba(255,255,255,.45); }
+.fete { margin: 2px 0 0 19px; font-size: 13px; color: var(--on-sapin-muted); }
+.fete:empty { display: none; }
+.next { margin: 16px 0 0; display: grid; gap: 2px; }
+#nextWhen { font: 500 26px/1.15 var(--serif); }
+.nextin { font-size: 14px; color: var(--on-sapin-muted); }
+
+h2 { font: 600 12px/1 var(--sans); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 28px 0 10px; }
+
+/* Aujourd'hui */
+.today { background: var(--surface); border-radius: 18px; overflow: hidden; }
+.today .row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; width: 100%; background: none; border: 0; text-align: left; }
+.today .row + .row { border-top: 1px solid var(--line); }
+.txt { flex: 1; min-width: 0; }
+.k { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; font-weight: 600; color: var(--accent); }
+.t { font: 600 21px/1.2 var(--serif); margin-top: 2px; }
+.s { display: block; font-size: 13px; color: var(--muted); margin-top: 1px; }
+.round { width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--sapin); color: #fff; display: grid; place-items: center; flex: none; }
+.round.soft { background: var(--bg); color: var(--accent); border: 1px solid var(--line); }
+
+.install { display: flex; gap: 12px; align-items: center; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; font-size: 14px; }
+.install button { margin-left: auto; border: 0; background: var(--sapin); color: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 600; flex: none; }
+
+/* Réveils */
+.alarms { list-style: none; margin: 0; padding: 0; }
+.alarm { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.alarm .open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; }
+.time { font: 500 50px/1 var(--serif); font-variant-numeric: lining-nums tabular-nums; letter-spacing: .01em; }
+.meta { font-size: 14px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alarm.off .time { color: var(--muted); opacity: .55; }
+.empty { padding: 18px 0; color: var(--muted); }
+.note { margin: 18px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--surface); font-size: 14px; color: var(--muted); }
+.note b { color: var(--fg); }
+
+.switch { appearance: none; -webkit-appearance: none; width: 52px; height: 32px; border-radius: 16px; background: var(--line); position: relative; flex: none; margin: 0; transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.switch:checked { background: var(--switch-on); }
+.switch:checked::after { transform: translateX(20px); }
+
+/* Barre du bas */
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--bg); border-top: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.bar-in { max-width: 528px; margin: 0 auto; display: flex; gap: 10px; }
+.btn { flex: 1; min-height: 52px; border-radius: 14px; border: 0; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; }
+.btn.primary { background: var(--sapin); color: #fff; }
+.btn.ghost { background: var(--surface); color: var(--fg); }
+.btn.danger { color: var(--danger); flex: 0 0 auto; }
+.btn.white { background: #fff; color: var(--sapin); }
+.btn.outline { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.55); }
+
+/* Feuilles (dialogues) */
+dialog { border: 0; padding: 0; width: 100%; max-width: 560px; max-height: 92dvh; margin: auto auto 0; border-radius: 22px 22px 0 0; background: var(--bg); color: var(--fg); }
+@media (min-width: 640px) { dialog { margin: auto; border-radius: 22px; } }
+dialog::backdrop { background: rgba(6, 18, 12, .55); }
+.sheet { display: flex; flex-direction: column; max-height: 92dvh; }
+.sheet-head { display: flex; align-items: center; padding: 12px 12px 4px 20px; }
+.sheet-head h3 { font: 600 24px/1.1 var(--serif); margin: 0; }
+.sheet-body { overflow: auto; padding: 8px 20px 20px; }
+.sheet-foot { display: flex; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.sheet-body h4 { font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 26px 0 10px; }
+.sheet-body h4:first-child { margin-top: 8px; }
+.timein { display: block; width: 100%; font: 500 64px/1 var(--serif); text-align: center; border: 0; border-radius: 18px; background: var(--surface); padding: 10px 12px; min-height: 92px; cursor: pointer; }
+.timein::-webkit-calendar-picker-indicator { display: none; }
+.field { display: grid; gap: 8px; margin: 18px 0; }
+.lab { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; }
+.text { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 12px 14px; min-height: 48px; }
+.days { display: flex; gap: 6px; justify-content: space-between; }
+.days button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: none; font-weight: 600; font-size: 14px; }
+.days button[aria-pressed="true"] { background: var(--sapin); border-color: var(--sapin); color: #fff; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 13px; background: var(--surface); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-align: center; padding: 10px 2px; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.seg input:checked + label { background: var(--bg); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); }
+.tracks { border: 1px solid var(--line); border-radius: 14px; max-height: 320px; overflow: auto; }
+.track { display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 12px; border-bottom: 1px solid var(--line); }
+.track:last-child { border-bottom: 0; }
+.track label { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: center; cursor: pointer; }
+.track input[type=radio] { width: 20px; height: 20px; margin: 0; accent-color: var(--switch-on); flex: none; }
+.track .t { font-size: 19px; }
+.track.pending .t { color: var(--muted); }
+.mini { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: none; display: grid; place-items: center; flex: none; color: var(--accent); }
+.mini svg.i { width: 18px; height: 18px; }
+.pill { border: 1px solid var(--accent); color: var(--accent); background: none; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; flex: none; }
+.link { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 8px 0; justify-self: start; }
+.opt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: var(--surface); cursor: pointer; }
+.opt b { font-weight: 600; }
+input[type=range] { width: 100%; accent-color: var(--switch-on); }
+.scale { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.hint { font-size: 14px; color: var(--muted); margin: 12px 0 0; }
+.steps { padding-left: 20px; margin: 0; display: grid; gap: 8px; font-size: 15px; }
+.credits { padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+.credits a { color: var(--accent); }
+summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
+
+/* Évangile */
+.gospel { font: 500 23px/1.5 var(--serif); }
+.gospel p { margin: 0 0 .7em; }
+.gospel .ref { font: 600 12px var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.gospel .intro { font-style: italic; }
+.gospel .accl { font-style: italic; margin-top: 1em; }
+.gospel span { transition: background .3s; border-radius: 4px; }
+.gospel .cur { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* Sonnerie */
+.ring { position: fixed; inset: 0; z-index: 50; background: var(--sapin); color: #fff; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 22px) max(20px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 18px) max(20px, env(safe-area-inset-left)); }
+.ring-in { max-width: 560px; width: 100%; margin: 0 auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.ring-head { display: flex; align-items: center; gap: 16px; }
+.ring .emb { width: 64px; height: 64px; color: #fff; --pivot: var(--sapin); transform-origin: 50% 12%; animation: sway 2.6s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+.ring .clock { font: 500 clamp(68px, 22vw, 112px)/.95 var(--serif); font-variant-numeric: lining-nums tabular-nums; }
+.rlab { font-size: 15px; color: var(--on-sapin-muted); }
+.rnow { margin: 22px 0 0; font: italic 500 22px/1.3 var(--serif); }
+.rlitu { margin: 4px 0 0; font-size: 14px; color: var(--on-sapin-muted); }
+.ring .gospel { flex: 1; overflow: auto; margin: 18px 0; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.18); min-height: 0; }
+.ring .gospel .ref { color: var(--on-sapin-muted); }
+.ring .gospel .cur { background: rgba(255,255,255,.16); }
+.ring-actions { display: flex; gap: 12px; margin-top: auto; }
+.ring-actions .btn { min-height: 62px; font-size: 17px; }
+
+/* Mode chevet */
+.night { position: fixed; inset: 0; z-index: 40; background: #000; color: #557566; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left)); }
+.night .clock { font: 500 clamp(88px, 30vw, 210px)/1 var(--serif); font-variant-numeric: lining-nums tabular-nums; }
+.night p { margin: 0; font-size: 16px; }
+.night .small { font-size: 13px; color: #34473D; max-width: 34ch; }
+.night button { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 28px); background: none; border: 1px solid #223129; color: #557566; border-radius: 999px; padding: 12px 20px; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 92px); z-index: 60; background: var(--fg); color: var(--bg); padding: 12px 16px; border-radius: 12px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .ring .emb { animation: none; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="emblem" viewBox="-200 -212 400 404">
+    <g fill="none" stroke="currentColor">
+      <circle r="165" stroke-width="28"/>
+      <path d="M-118 130-146 172M118 130 146 172" stroke-width="26" stroke-linecap="round"/>
+      <path d="M0-84V122M-82 0H82" stroke-width="30"/>
+    </g>
+    <g fill="currentColor">
+      <path d="M-62-192A62 62 0 0 1 62-192Z" transform="rotate(-42)"/>
+      <path d="M-62-192A62 62 0 0 1 62-192Z" transform="rotate(42)"/>
+    </g>
+    <circle r="9" style="fill: var(--pivot, #1E4B39)"/>
+  </symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="emb" aria-hidden="true"><use href="#emblem"/></svg>
+      <h1>Angélus</h1>
+      <button class="icon-btn" id="openSettings" aria-label="Réglages"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.3"/><circle cx="9.5" cy="17" r="2.3"/></svg></button>
+    </div>
+    <p class="litu" id="litu"><i class="dot"></i><span>Chargement du jour liturgique…</span></p>
+    <p class="fete" id="fete"></p>
+    <p class="next"><span id="nextWhen"></span><span class="nextin" id="nextIn"></span></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="install" id="install" hidden>
+    <span>Installez Angélus sur l’écran d’accueil pour l’ouvrir comme une app.</span>
+    <button id="installBtn">Installer</button>
+  </div>
+
+  <h2>Aujourd’hui</h2>
+  <div class="today">
+    <div class="row">
+      <div class="txt"><div class="k">Chant grégorien du jour</div><div class="t" id="tChant"></div><span class="s" id="tChantSub"></span></div>
+      <button class="round" id="tPlay" data-play="" aria-label="Écouter le chant du jour"></button>
+    </div>
+    <button class="row" id="tGospel">
+      <div class="txt"><div class="k">Évangile du jour</div><div class="t" id="tEv">Chargement…</div><span class="s" id="tEvSub"></span></div>
+      <span class="round soft" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 5.5c3-1.2 6-1 8.5.8 2.5-1.8 5.5-2 8.5-.8v13c-3-1.2-6-1-8.5.8-2.5-1.8-5.5-2-8.5-.8zM12 6.3v13.5"/></svg></span>
+    </button>
+  </div>
+
+  <h2>Réveils</h2>
+  <ul class="alarms" id="alarms"></ul>
+  <p class="note">Angélus sonne tant que l’app reste ouverte. Le soir, touchez <b>Mode chevet</b> et laissez le téléphone en charge : l’écran reste allumé, très sombre.</p>
+</main>
+
+<nav class="bar">
+  <div class="bar-in">
+    <button class="btn ghost" id="add"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Réveil</button>
+    <button class="btn primary" id="nightBtn"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z"/></svg>Mode chevet</button>
+  </div>
+</nav>
+
+<dialog id="edit" aria-labelledby="eTitle">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="eTitle">Nouveau réveil</h3><button class="icon-btn" data-close aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="sheet-body">
+      <input type="time" id="eTime" class="timein" aria-label="Heure du réveil">
+      <div class="field"><span class="lab">Répéter</span><div class="days" id="eDays"></div></div>
+      <div class="field"><label class="lab" for="eLabel">Nom</label><input id="eLabel" class="text" placeholder="Laudes, travail…" maxlength="40" autocomplete="off"></div>
+      <div class="field">
+        <span class="lab">Sonnerie</span>
+        <div class="seg" role="radiogroup" aria-label="Type de chant">
+          <input type="radio" name="cat" id="cGreg" value="greg"><label for="cGreg">Grégorien</label>
+          <input type="radio" name="cat" id="cPar" value="paroles"><label for="cPar">Cantiques</label>
+          <input type="radio" name="cat" id="cIns" value="instru"><label for="cIns">Instrumental</label>
+        </div>
+        <div class="tracks" id="eTracks"></div>
+        <button type="button" class="link" id="eImport">+ Ajouter mes fichiers audio</button>
+      </div>
+      <label class="opt" for="eGospel">
+        <span class="txt"><b>Lecture de l’Évangile du jour</b><span class="s">Voix posée ; le chant continue en fond</span></span>
+        <input type="checkbox" class="switch" id="eGospel">
+      </label>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn ghost danger" id="eDelete">Supprimer</button>
+      <button type="button" class="btn primary" id="eSave">Enregistrer</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="settings" aria-labelledby="sTitle">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="sTitle">Réglages</h3><button class="icon-btn" data-close aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="sheet-body">
+      <h4>Voix de lecture</h4>
+      <div class="field"><label class="lab" for="sVoice">Voix</label><select id="sVoice" class="text"></select></div>
+      <div class="field"><label class="lab" for="sRate">Débit</label><input type="range" id="sRate" min="0.7" max="1.1" step="0.02"><div class="scale"><span>Posé</span><span>Vif</span></div></div>
+      <div class="field"><label class="lab" for="sPitch">Timbre</label><input type="range" id="sPitch" min="0.6" max="1.2" step="0.02"><div class="scale"><span>Grave</span><span>Clair</span></div></div>
+      <button type="button" class="btn ghost" id="sTest" style="width:100%">Écouter un extrait</button>
+      <p class="hint">Pour une voix plus humaine, gratuite : sur iPhone, Réglages › Accessibilité › Contenu énoncé › Voix › Français, puis téléchargez une voix « améliorée » ou « premium ». Sur Android, Paramètres › Synthèse vocale › Google, voix française haute qualité.</p>
+
+      <h4>Sonnerie</h4>
+      <div class="field"><label class="lab" for="sFade">Montée du volume</label>
+        <select id="sFade" class="text"><option value="0">Immédiate</option><option value="15">Sur 15 secondes</option><option value="30">Sur 30 secondes</option><option value="60">Sur 1 minute</option></select></div>
+      <div class="field"><label class="lab" for="sSnooze">Répétition</label>
+        <select id="sSnooze" class="text"><option value="5">5 minutes</option><option value="9">9 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
+
+      <h4 id="howto">Installer sur le téléphone</h4>
+      <ol class="steps">
+        <li><b>iPhone</b> : ouvrez cette page dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».</li>
+        <li><b>Android</b> : dans Chrome, menu ⋮ puis « Installer l’application ».</li>
+      </ol>
+      <h4>Pour que le réveil sonne</h4>
+      <p class="hint" style="margin-top:0">Une app web ne peut pas réveiller un téléphone verrouillé. Le soir, ouvrez Angélus et touchez <b>Mode chevet</b> : l’écran reste allumé, presque noir, et le chant du lendemain est déjà téléchargé. Branchez le téléphone et laissez le volume média monté.</p>
+
+      <h4>Crédits</h4>
+      <details><summary>Enregistrements (Wikimedia Commons)</summary><ul class="credits" id="credits"></ul></details>
+      <p class="hint">Textes liturgiques : AELF. Les fichiers que vous ajoutez restent sur ce téléphone.</p>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="reader" aria-labelledby="rdTitle">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="rdTitle">Évangile du jour</h3><button class="icon-btn" data-close aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="sheet-body"><article class="gospel" id="readText"></article></div>
+    <div class="sheet-foot"><button type="button" class="btn primary" id="readListen">Écouter avec le chant du jour</button></div>
+  </div>
+</dialog>
+
+<div class="ring" id="ring" role="alertdialog" aria-label="Réveil" hidden>
+  <div class="ring-in">
+    <div class="ring-head">
+      <svg class="emb" aria-hidden="true"><use href="#emblem"/></svg>
+      <div><div class="clock" id="rClock"></div><div class="rlab" id="rLabel"></div></div>
+    </div>
+    <p class="rnow" id="rNow"></p>
+    <p class="rlitu" id="rLitu"></p>
+    <article class="gospel" id="rGospel"></article>
+    <div class="ring-actions">
+      <button class="btn outline" id="snooze">Répéter</button>
+      <button class="btn white" id="stop">Arrêter</button>
+    </div>
+  </div>
+</div>
+
+<div class="night" id="night" hidden>
+  <div class="clock" id="nClock"></div>
+  <p id="nInfo"></p>
+  <p class="small">Laissez le téléphone en charge. L’écran restera allumé.</p>
+  <button id="nExit">Quitter le mode chevet</button>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<input type="file" id="file" accept="audio/*" multiple hidden>
+
+<script src="chants.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const ICON = {
+  play: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>',
+  stop: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>',
+  trash: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>'
+};
+const CAT_DAY = { greg: 'Grégorien du jour', paroles: 'Cantique du jour', instru: 'Instrumental du jour' };
+const CAT_SUB = { greg: 'Change chaque jour, selon le temps liturgique', paroles: 'Un cantique différent chaque jour', instru: 'Une pièce différente chaque jour' };
+const COUL = { vert: '#3E8E5E', violet: '#7446A8', blanc: '#FFFFFF', rouge: '#C0392B', rose: '#E7A1BD', noir: '#111111', or: '#D4AF37' };
+const DL = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const DFULL = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const DSHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const WEEK = [1, 2, 3, 4, 5, 6, 0];
+// Chants protégés : la liste est pré-inscrite, chacun ajoute son propre fichier.
+const WISH = [['Ave Maria', 'Ad Dei Gloriam'], ['Alléluia', 'Messe de saint Michel'], ['Mon Père, je m’abandonne à toi', 'Prière de Charles de Foucauld'], ['Choisis la vie', 'Celebratio'], ['Mon chant d’aujourd’hui', 'Ad Dei Gloriam']];
+
+/* ---------- État (sur ce téléphone) ---------- */
+const KEY = 'angelus.v1';
+const defaults = () => ({
+  alarms: [
+    { id: 'a1', h: 6, m: 30, days: [1, 2, 3, 4, 5], on: true, label: '', cat: 'greg', track: 'auto', gospel: true, armed: Date.now() },
+    { id: 'a2', h: 8, m: 0, days: [6, 0], on: false, label: 'Week-end', cat: 'paroles', track: 'auto', gospel: true, armed: Date.now() }
+  ],
+  set: { voice: '', rate: 0.9, pitch: 0.9, snooze: 9, fade: 30 },
+  user: WISH.map(([t, sub], i) => ({ id: 'w' + i, cat: 'paroles', t, sub, user: true, pending: true })),
+  snooze: null
+});
+let S = null;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch {}
+S = S || defaults();
+S.set = { ...defaults().set, ...S.set };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+
+/* ---------- Dates ---------- */
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const hhmm = (h, m) => pad(h) + ':' + pad(m);
+const dayNum = d => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const mmss = s => `${Math.floor(s / 60)}:${pad(s % 60)}`;
+function inWords(ms) {
+  const m = Math.max(1, Math.round(ms / 6e4)), h = Math.floor(m / 60), r = m % 60;
+  return h ? `${h} h${r ? ' ' + pad(r) : ''}` : `${r} min`;
+}
+function whenWord(d) {
+  const diff = dayNum(d) - dayNum(new Date());
+  return diff === 0 ? 'aujourd’hui' : diff === 1 ? 'demain' : DFULL[d.getDay()];
+}
+function daysLine(days) {
+  const k = [...days].sort().join();
+  if (!days.length) return 'Une fois';
+  if (days.length === 7) return 'Tous les jours';
+  if (k === '1,2,3,4,5') return 'En semaine';
+  if (k === '0,6') return 'Le week-end';
+  return WEEK.filter(d => days.includes(d)).map(d => DSHORT[d]).join(' ');
+}
+function nextFire(a, from = new Date()) {
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(from); d.setDate(d.getDate() + i); d.setHours(a.h, a.m, 0, 0);
+    if (d > from && (!a.days.length || a.days.includes(d.getDay()))) return d;
+  }
+}
+function nextAlarm() {
+  let best = null;
+  for (const a of S.alarms) if (a.on) { const at = nextFire(a); if (at && (!best || at < best.at)) best = { a, at }; }
+  const sa = S.snooze && S.alarms.find(x => x.id === S.snooze.id);
+  if (sa && (!best || S.snooze.at < best.at)) best = { a: sa, at: new Date(S.snooze.at) };
+  return best;
+}
+
+/* ---------- Liturgie (AELF) ---------- */
+const cachedDay = date => { try { return JSON.parse(localStorage.getItem('aelf:' + date)); } catch { return null; } };
+async function getDay(date) {
+  const c = cachedDay(date);
+  if (c) return c;
+  const r = await fetch(`https://api.aelf.org/v1/messes/${date}/france`);
+  if (!r.ok) throw new Error('AELF ' + r.status);
+  const j = await r.json();
+  const messe = j.messes.find(m => /du jour/i.test(m.nom)) || j.messes[0];
+  const ev = messe.lectures.find(l => l.type === 'evangile');
+  const i = j.informations;
+  const out = { info: { ligne1: i.ligne1 || '', ligne2: i.ligne2 || '', couleur: i.couleur, temps: i.temps_liturgique }, ev: ev && { ref: ev.ref, intro: ev.intro_lue, html: ev.contenu } };
+  try { localStorage.setItem('aelf:' + date, JSON.stringify(out)); } catch {}
+  return out;
+}
+try { for (const k of Object.keys(localStorage)) if (k.startsWith('aelf:') && k.slice(5) < ymd(new Date())) localStorage.removeItem(k); } catch {}
+const litu = info => cap(info.ligne1.replace(/\s*\(.*?\)/g, '').replace(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi),\s*/i, '').replace(/(\d+)(ème|eme)/g, '$1e'));
+function season(info, d) {
+  const t = info && info.temps;
+  if (t === 'triduum') return 'careme';
+  if (['avent', 'noel', 'careme', 'pascal', 'ordinaire'].includes(t)) return t;
+  const m = d.getMonth(), day = d.getDate();
+  return (m === 11 && day >= 25) || (m === 0 && day < 14) ? 'noel' : 'ordinaire';
+}
+
+/* ---------- Banque de chants ---------- */
+const allTracks = () => [...S.user, ...CHANTS]; // vos chants d'abord
+const byId = id => allTracks().find(t => t.id === id);
+const inCat = cat => allTracks().filter(t => t.cat === cat);
+function ofDay(cat, d, info) {
+  const s = season(info, d);
+  const ok = inCat(cat).filter(t => !t.pending && (!t.s || t.s.includes(s)));
+  const special = ok.filter(t => t.s && !t.s.includes('ordinaire'));
+  const pool = [...special, ...special, ...ok]; // les chants propres au temps reviennent deux fois plus souvent
+  return pool[dayNum(d) % pool.length] || CHANTS[0];
+}
+const trackFor = (a, d, info) => (a.track !== 'auto' && byId(a.track) && !byId(a.track).pending && byId(a.track)) || ofDay(a.cat, d, info);
+
+/* ---------- Son ---------- */
+const player = new Audio();
+player.crossOrigin = 'anonymous';
+player.preload = 'auto';
+let ctx, gain, bellTimer, prepared = null, nowPlaying = null, ringing = null, readTok = 0, primed = false, wake = null;
+function audio() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    gain = ctx.createGain(); gain.gain.value = 0;
+    ctx.createMediaElementSource(player).connect(gain);
+    gain.connect(ctx.destination);
+  }
+  if (ctx.state !== 'running') ctx.resume();
+  return ctx;
+}
+// À appeler pendant un geste : iOS n'autorise ensuite le son et la voix sans toucher l'écran.
+function unlock(src) {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+  audio();
+  if (!primed && 'speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); primed = true; }
+  if (src && player.paused && !nowPlaying) { player.src = src; player.play().then(() => { if (!nowPlaying) player.pause(); }).catch(() => {}); }
+}
+document.addEventListener('pointerdown', () => unlock(), { once: true });
+const hold = (p, t) => p.cancelAndHoldAtTime ? p.cancelAndHoldAtTime(t) : (p.cancelScheduledValues(t), p.setValueAtTime(p.value, t));
+
+async function srcFor(t) {
+  if (t.user) {
+    const r = 'caches' in window && await (await caches.open('angelus-user')).match('user/' + t.id);
+    return r ? URL.createObjectURL(await r.blob()) : null;
+  }
+  return prepared && prepared.id === t.id ? prepared.url : t.url;
+}
+async function play(t, { fade = 0, loop = true } = {}) {
+  stopSound(); audio();
+  nowPlaying = t.id; paintPlay();
+  const src = await srcFor(t).catch(() => null);
+  // null = remplacé par une autre lecture ; false = échec réel
+  const fail = () => { if (nowPlaying !== t.id) return null; nowPlaying = null; paintPlay(); return false; };
+  if (!src || nowPlaying !== t.id) return fail();
+  player.loop = loop; player.src = src;
+  const g = gain.gain, n = ctx.currentTime;
+  g.cancelScheduledValues(n); g.setValueAtTime(fade ? 0.03 : 1, n); // départ doux mais audible
+  if (fade) g.exponentialRampToValueAtTime(1, n + fade);
+  try { await player.play(); return true; } catch { return fail(); }
+}
+function stopSound() {
+  nowPlaying = null; player.pause();
+  clearInterval(bellTimer); bellTimer = null;
+  if (gain) { gain.gain.cancelScheduledValues(ctx.currentTime); gain.gain.value = 0; }
+  paintPlay();
+}
+function duck(on) { if (!gain) return; const n = ctx.currentTime; hold(gain.gain, n); gain.gain.setTargetAtTime(on ? 0.15 : 1, n, 0.7); }
+// Secours si le chant ne se charge pas : une cloche douce, synthétisée sur place.
+function bell() {
+  audio(); stopSound(); nowPlaying = 'bell'; gain.gain.value = 1;
+  const strike = () => {
+    const t0 = ctx.currentTime;
+    [0.5, 1, 1.19, 1.56, 2, 2.74, 3.76].forEach((r, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 330 * r;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.22 / (1 + i * 0.6), t0 + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 4);
+      o.connect(g); g.connect(gain); o.start(t0); o.stop(t0 + 4.1);
+    });
+  };
+  strike(); bellTimer = setInterval(strike, 3200);
+}
+player.addEventListener('ended', () => { if (!player.loop) { nowPlaying = null; paintPlay(); } });
+function paintPlay() {
+  document.querySelectorAll('[data-play]').forEach(b => {
+    const on = b.dataset.play && nowPlaying === b.dataset.play;
+    b.innerHTML = on ? ICON.stop : ICON.play;
+    b.setAttribute('aria-label', on ? 'Arrêter l’écoute' : 'Écouter');
+  });
+}
+function togglePreview(id) {
+  if (ringing) return;
+  if (nowPlaying === id) return stopSound();
+  play(byId(id), { loop: false }).then(ok => { if (ok === false) toast('Lecture impossible. Vérifiez la connexion.'); });
+}
+
+/* ---------- Voix ---------- */
+const vScore = v =>
+  (/fr[-_]FR/i.test(v.lang) ? 3 : 0) + (/natural|neural|premium|enhanced|améliorée|online/i.test(v.name) ? 6 : 0) +
+  (/google/i.test(v.name) ? 2 : 0) + (/thomas|henri|paul|r[ée]m[iy]|nicolas|antoine|vincent|yves/i.test(v.name) ? 1 : 0) -
+  (/eddy|flo|grand|reed|rocko|sandy|shelley|jacques/i.test(v.name) ? 20 : 0);
+const frVoices = () => ('speechSynthesis' in window ? speechSynthesis.getVoices() : []).filter(v => /^fr/i.test(v.lang)).sort((a, b) => vScore(b) - vScore(a));
+const pickVoice = () => { const vs = frVoices(); return vs.find(v => v.name === S.set.voice) || vs[0]; };
+function speak(text) {
+  return new Promise(res => {
+    if (!('speechSynthesis' in window)) return res();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'fr-FR'; const v = pickVoice(); if (v) u.voice = v;
+    u.rate = S.set.rate; u.pitch = S.set.pitch;
+    const done = () => { clearTimeout(t); res(); };
+    const t = setTimeout(done, 4000 + text.length * 110 / S.set.rate); // certains navigateurs oublient "onend"
+    u.onend = u.onerror = done;
+    window.__utt = u; // iOS perd parfois l'énoncé s'il n'est plus référencé
+    speechSynthesis.speak(u);
+  });
+}
+// Texte AELF → paragraphes → membres de phrase (le lecteur marque une pause aux points, deux-points et points-virgules).
+function gospelParts(ev) {
+  const doc = new DOMParser().parseFromString(ev.html || '', 'text/html');
+  doc.querySelectorAll('br').forEach(b => b.replaceWith(' '));
+  let paras = [...doc.querySelectorAll('p')].map(p => p.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!paras.length) paras = [doc.body.textContent.replace(/\s+/g, ' ').trim()];
+  return paras.map(p => (p.match(/[^.!?…;:]+(?:[.!?…;:]+(?:\s*[»”])?|$)/g) || [p]).map(s => s.trim()).filter(Boolean));
+}
+function renderGospel(el, ev) {
+  let i = 0;
+  el.innerHTML = `<p class="ref">${esc(ev.ref)}</p><p class="intro">${esc(ev.intro || '')}</p>` +
+    gospelParts(ev).map(ss => '<p>' + ss.map(s => `<span data-i="${i++}">${esc(s)}</span>`).join(' ') + '</p>').join('') +
+    '<p class="accl">— Acclamons la Parole de Dieu.</p>';
+}
+async function readGospel(ev, el) {
+  const tok = ++readTok;
+  const say = async (text, pause, i) => {
+    if (tok !== readTok) return false;
+    el.querySelectorAll('.cur').forEach(x => x.classList.remove('cur'));
+    const sp = i != null && el.querySelector(`[data-i="${i}"]`);
+    if (sp) { sp.classList.add('cur'); sp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    await speak(text); await sleep(pause);
+    return tok === readTok;
+  };
+  if (!await say(ev.intro || 'Évangile de Jésus Christ', 1100)) return;
+  let i = 0;
+  for (const ss of gospelParts(ev)) for (let k = 0; k < ss.length; k++) if (!await say(ss[k], k === ss.length - 1 ? 800 : 320, i++)) return;
+  await sleep(500);
+  await say('Acclamons la Parole de Dieu.', 0);
+  el.querySelectorAll('.cur').forEach(x => x.classList.remove('cur'));
+}
+
+/* ---------- Sonnerie ---------- */
+async function keepAwake() { try { if (!wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch {} }
+function releaseWake() { try { wake && wake.release(); } catch {} wake = null; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (ringing || !$('#night').hidden)) keepAwake(); });
+
+async function ring(a, { preview = false } = {}) {
+  if (ringing) return;
+  ringing = a;
+  const now = new Date(), date = ymd(now);
+  let day = cachedDay(date);
+  const t = trackFor(a, now, day && day.info);
+  $('#rLabel').textContent = preview ? 'Évangile du jour' : (a.label || 'Bonjour');
+  $('#rNow').textContent = `${t.t} — ${t.sub}`;
+  $('#rLitu').textContent = day ? litu(day.info) : '';
+  $('#rGospel').innerHTML = '';
+  $('#snooze').hidden = preview;
+  $('#snooze').textContent = `Répéter · ${S.set.snooze} min`;
+  $('#ring').hidden = false;
+  tick(); keepAwake();
+  const ok = await play(t, { fade: preview ? 0 : S.set.fade });
+  if (ok === false && ringing === a) bell();
+  if (ctx.state !== 'running') $('#rLabel').textContent = 'Touchez l’écran pour lancer le chant';
+  if (!a.gospel) return;
+  if (!day) day = await getDay(date).catch(() => null);
+  if (ringing !== a) return;
+  if (!day || !day.ev) { $('#rGospel').innerHTML = '<p class="ref">Évangile indisponible sans connexion</p>'; return; }
+  $('#rLitu').textContent = litu(day.info);
+  renderGospel($('#rGospel'), day.ev);
+  await sleep(preview ? 2500 : 9000); // le chant s'installe avant la lecture
+  if (ringing !== a) return;
+  duck(true);
+  await readGospel(day.ev, $('#rGospel'));
+  if (ringing === a) duck(false);
+}
+function stopRing() {
+  ringing = null; readTok++;
+  try { speechSynthesis.cancel(); } catch {}
+  stopSound();
+  $('#ring').hidden = true;
+  if ($('#night').hidden) releaseWake();
+  render();
+}
+// Si le téléphone a bloqué le son (aucun toucher avant), un toucher sur l'écran de réveil le relance.
+$('#ring').addEventListener('pointerdown', () => {
+  unlock();
+  if (ringing && nowPlaying && nowPlaying !== 'bell' && player.paused) player.play().catch(() => {});
+});
+$('#stop').onclick = () => { if (S.snooze && ringing && S.snooze.id === ringing.id) S.snooze = null; save(); stopRing(); };
+$('#snooze').onclick = () => {
+  const at = Date.now() + S.set.snooze * 6e4;
+  S.snooze = { id: ringing.id, at }; save(); stopRing();
+  const d = new Date(at); toast(`Je sonnerai de nouveau à ${hhmm(d.getHours(), d.getMinutes())}.`);
+};
+
+function tick() {
+  const now = new Date(), hm = hhmm(now.getHours(), now.getMinutes());
+  $('#nClock').textContent = hm; $('#rClock').textContent = hm;
+  if (hm !== tick.hm) { tick.hm = hm; renderNext(); }
+  if (ymd(now) !== tick.dd) { if (tick.dd) loadToday(); tick.dd = ymd(now); }
+  if (ringing) return;
+  if (S.snooze && Date.now() >= S.snooze.at) {
+    const a = S.alarms.find(x => x.id === S.snooze.id);
+    S.snooze = null; save();
+    if (a) return ring(a);
+  }
+  for (const a of S.alarms) {
+    if (!a.on) continue;
+    const d = new Date(now); d.setHours(a.h, a.m, 0, 0);
+    const key = ymd(d) + 'T' + hhmm(a.h, a.m), late = now - d;
+    // fenêtre de 10 min : le navigateur peut ralentir les minuteurs
+    if (late >= 0 && late < 6e5 && d.getTime() > (a.armed || 0) && a.last !== key && (!a.days.length || a.days.includes(d.getDay()))) {
+      a.last = key; if (!a.days.length) a.on = false;
+      save(); render();
+      return ring(a);
+    }
+  }
+}
+
+/* ---------- Mode chevet ---------- */
+$('#nightBtn').onclick = () => {
+  const n = nextAlarm();
+  const t = n && trackFor(n.a, n.at, (cachedDay(ymd(n.at)) || {}).info);
+  unlock(t && !t.user ? t.url : CHANTS[0].url);
+  $('#night').hidden = false; keepAwake(); renderNext(); prepare(n);
+};
+$('#nExit').onclick = () => { $('#night').hidden = true; if (!ringing) releaseWake(); };
+// Télécharge à l'avance l'évangile et le chant du prochain réveil : rien ne dépend du réseau au moment de sonner.
+async function prepare(n) {
+  if (!n) return;
+  const day = await getDay(ymd(n.at)).catch(() => null);
+  const t = trackFor(n.a, n.at, day && day.info);
+  if (t.user || (prepared && prepared.id === t.id)) return;
+  try {
+    const b = await (await fetch(t.url)).blob();
+    if (prepared) URL.revokeObjectURL(prepared.url);
+    prepared = { id: t.id, url: URL.createObjectURL(b) };
+  } catch {}
+}
+
+/* ---------- Écran principal ---------- */
+function soundLine(a) {
+  const t = a.track !== 'auto' && byId(a.track);
+  return (t && !t.pending ? t.t : CAT_DAY[a.cat]) + (a.gospel ? ' · Évangile' : '');
+}
+function render() {
+  const list = [...S.alarms].sort((x, y) => x.h * 60 + x.m - (y.h * 60 + y.m));
+  $('#alarms').innerHTML = list.map(a => `
+    <li class="alarm${a.on ? '' : ' off'}">
+      <button class="open" data-id="${a.id}" aria-label="Modifier le réveil de ${hhmm(a.h, a.m)}">
+        <div class="time">${hhmm(a.h, a.m)}</div>
+        <div class="meta">${esc([a.label, daysLine(a.days), soundLine(a)].filter(Boolean).join(' · '))}</div>
+      </button>
+      <input type="checkbox" class="switch" data-id="${a.id}" ${a.on ? 'checked' : ''} aria-label="Activer le réveil de ${hhmm(a.h, a.m)}">
+    </li>`).join('') || '<li class="empty">Aucun réveil pour l’instant.</li>';
+  renderNext();
+}
+function renderNext() {
+  const n = nextAlarm();
+  $('#nextWhen').textContent = n ? `${cap(whenWord(n.at))} à ${hhmm(n.at.getHours(), n.at.getMinutes())}` : 'Aucun réveil activé';
+  $('#nextIn').textContent = n ? `Prochain réveil dans ${inWords(n.at - new Date())}` : '';
+  $('#nInfo').textContent = n ? `Réveil ${whenWord(n.at)} à ${hhmm(n.at.getHours(), n.at.getMinutes())} · ${soundLine(n.a)}` : 'Aucun réveil activé';
+}
+let todayTrack = null;
+function paintToday(day, failed) {
+  const now = new Date();
+  todayTrack = ofDay('greg', now, day && day.info);
+  $('#tChant').textContent = todayTrack.t;
+  $('#tChantSub').textContent = todayTrack.sub;
+  $('#tPlay').dataset.play = todayTrack.id; paintPlay();
+  const date = cap(now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }));
+  $('#litu').innerHTML = `<i class="dot" style="background:${day ? COUL[day.info.couleur] || '#fff' : 'transparent'}"></i><span>${esc(date)}${day ? ' · ' + esc(litu(day.info)) : ''}</span>`;
+  $('#fete').textContent = day ? day.info.ligne2 : '';
+  $('#tEv').textContent = day && day.ev ? day.ev.ref : failed ? 'Indisponible sans connexion' : 'Chargement…';
+  $('#tEvSub').textContent = day && day.ev ? day.ev.intro : '';
+}
+async function loadToday() {
+  const date = ymd(new Date());
+  paintToday(cachedDay(date));
+  try { paintToday(await getDay(date)); } catch { paintToday(null, true); }
+}
+$('#alarms').addEventListener('click', e => { const b = e.target.closest('.open'); if (b) openEditor(b.dataset.id); });
+$('#alarms').addEventListener('change', e => {
+  const a = S.alarms.find(x => x.id === e.target.dataset.id);
+  a.on = e.target.checked; a.armed = Date.now();
+  if (S.snooze && S.snooze.id === a.id && !a.on) S.snooze = null;
+  save(); render();
+  if (a.on) { unlock(); toast(`Réveil dans ${inWords(nextFire(a) - new Date())}.`); }
+});
+$('#tGospel').onclick = () => {
+  const day = cachedDay(ymd(new Date()));
+  if (!day || !day.ev) return toast('Évangile indisponible sans connexion.');
+  renderGospel($('#readText'), day.ev); $('#reader').showModal();
+};
+$('#readListen').onclick = () => { $('#reader').close(); ring({ id: 'preview', cat: 'greg', track: 'auto', gospel: true }, { preview: true }); };
+
+/* ---------- Éditeur de réveil ---------- */
+let edit = null, attachId = null;
+function openEditor(id) {
+  const a = id ? S.alarms.find(x => x.id === id)
+    : { id: 'a' + Date.now().toString(36), h: 7, m: 0, days: [1, 2, 3, 4, 5], on: true, label: '', cat: 'greg', track: 'auto', gospel: true };
+  edit = JSON.parse(JSON.stringify(a)); edit.isNew = !id;
+  $('#eTitle').textContent = id ? 'Modifier le réveil' : 'Nouveau réveil';
+  $('#eTime').value = hhmm(edit.h, edit.m);
+  $('#eLabel').value = edit.label;
+  $('#eGospel').checked = edit.gospel;
+  $('#eDelete').hidden = !id;
+  document.querySelector(`input[name=cat][value=${edit.cat}]`).checked = true;
+  paintDays(); paintTracks();
+  $('#edit').showModal();
+}
+function paintDays() {
+  $('#eDays').innerHTML = WEEK.map(d => `<button type="button" data-d="${d}" aria-pressed="${edit.days.includes(d)}" aria-label="${DFULL[d]}">${DL[d]}</button>`).join('');
+}
+$('#eTime').onclick = e => { try { e.target.showPicker(); } catch {} };
+$('#eDays').onclick = e => {
+  const b = e.target.closest('[data-d]'); if (!b) return;
+  const d = +b.dataset.d;
+  edit.days = edit.days.includes(d) ? edit.days.filter(x => x !== d) : [...edit.days, d];
+  paintDays();
+};
+function paintTracks() {
+  const today = ofDay(edit.cat, new Date(), (cachedDay(ymd(new Date())) || {}).info);
+  const row = (id, t, sub, tr) => `
+    <div class="track${tr && tr.pending ? ' pending' : ''}">
+      <label><input type="radio" name="track" value="${id}" ${edit.track === id ? 'checked' : ''} ${tr && tr.pending ? 'disabled' : ''}>
+        <span class="txt"><span class="t">${esc(t)}</span><span class="s">${esc(sub)}</span></span></label>
+      ${tr && tr.pending ? `<button type="button" class="pill" data-attach="${id}">Ajouter le fichier</button>` : tr ? `<button type="button" class="mini" data-play="${id}"></button>` : ''}
+      ${tr && tr.user && !tr.pending ? `<button type="button" class="mini" data-del="${id}" aria-label="Retirer ${esc(t)}">${ICON.trash}</button>` : ''}
+    </div>`;
+  $('#eTracks').innerHTML = row('auto', CAT_DAY[edit.cat], `${CAT_SUB[edit.cat]} · aujourd’hui : ${today.t}`) +
+    inCat(edit.cat).map(t => row(t.id, t.t, t.pending ? `${t.sub} · fichier à ajouter` : t.sub + (t.dur ? ' · ' + mmss(t.dur) : ''), t)).join('');
+  paintPlay();
+}
+document.querySelectorAll('input[name=cat]').forEach(r => r.onchange = () => { edit.cat = r.value; edit.track = 'auto'; paintTracks(); });
+$('#eTracks').onchange = e => { if (e.target.name === 'track') edit.track = e.target.value; };
+$('#eSave').onclick = () => {
+  const [h, m] = ($('#eTime').value || hhmm(edit.h, edit.m)).split(':').map(Number);
+  Object.assign(edit, { h, m, label: $('#eLabel').value.trim(), gospel: $('#eGospel').checked, on: true, armed: Date.now() });
+  const isNew = edit.isNew; delete edit.isNew;
+  if (isNew) S.alarms.push(edit); else S.alarms[S.alarms.findIndex(x => x.id === edit.id)] = edit;
+  if (S.snooze && S.snooze.id === edit.id) S.snooze = null;
+  save(); render(); $('#edit').close();
+  const t = trackFor(edit, nextFire(edit), null);
+  unlock(t.user ? null : t.url);
+  toast(`Réveil réglé · dans ${inWords(nextFire(edit) - new Date())}.`);
+};
+$('#eDelete').onclick = () => {
+  S.alarms = S.alarms.filter(x => x.id !== edit.id);
+  if (S.snooze && S.snooze.id === edit.id) S.snooze = null;
+  save(); render(); $('#edit').close(); toast('Réveil supprimé.');
+};
+
+/* ---------- Mes fichiers audio (gardés sur le téléphone) ---------- */
+$('#eImport').onclick = () => { attachId = null; $('#file').multiple = true; $('#file').click(); };
+$('#eTracks').addEventListener('click', e => {
+  const at = e.target.closest('[data-attach]');
+  if (at) { attachId = at.dataset.attach; $('#file').multiple = false; $('#file').click(); }
+  const del = e.target.closest('[data-del]');
+  if (del) removeUser(del.dataset.del);
+});
+$('#file').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  if (!('caches' in window)) return toast('Import impossible ici : ouvrez l’app installée.');
+  const c = await caches.open('angelus-user');
+  for (const [i, f] of files.entries()) {
+    const target = attachId && S.user.find(u => u.id === attachId);
+    const id = target ? target.id : 'u' + Date.now().toString(36) + i;
+    await c.put('user/' + id, new Response(f, { headers: { 'Content-Type': f.type || 'audio/mpeg' } }));
+    if (target) { target.pending = false; attachId = null; edit.track = id; }
+    else S.user.push({ id, cat: edit.cat, t: f.name.replace(/\.[^.]+$/, ''), sub: 'Mon fichier', user: true });
+  }
+  save(); paintTracks(); toast('Ajouté à votre banque de chants.');
+};
+async function removeUser(id) {
+  try { await (await caches.open('angelus-user')).delete('user/' + id); } catch {}
+  const w = S.user.find(u => u.id === id);
+  if (w && w.id.startsWith('w')) w.pending = true; else S.user = S.user.filter(u => u.id !== id);
+  S.alarms.forEach(a => { if (a.track === id) a.track = 'auto'; });
+  if (edit && edit.track === id) edit.track = 'auto';
+  save(); paintTracks(); render();
+}
+
+/* ---------- Réglages ---------- */
+function fillVoices() {
+  const vs = frVoices(), cur = pickVoice();
+  $('#sVoice').innerHTML = vs.length ? vs.map(v => `<option value="${esc(v.name)}" ${cur && v.name === cur.name ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('') : '<option>Aucune voix française sur cet appareil</option>';
+}
+if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', fillVoices);
+$('#openSettings').onclick = () => {
+  fillVoices();
+  $('#sRate').value = S.set.rate; $('#sPitch').value = S.set.pitch;
+  $('#sFade').value = S.set.fade; $('#sSnooze').value = S.set.snooze;
+  $('#credits').innerHTML = CHANTS.map(c => `<li><a href="${c.page}" target="_blank" rel="noopener">${esc(c.t)}</a> — ${esc(c.by || c.sub)} · ${esc(c.lic)}</li>`).join('');
+  $('#settings').showModal();
+};
+$('#sVoice').onchange = e => { S.set.voice = e.target.value; save(); };
+$('#sRate').oninput = e => { S.set.rate = +e.target.value; save(); };
+$('#sPitch').oninput = e => { S.set.pitch = +e.target.value; save(); };
+$('#sFade').onchange = e => { S.set.fade = +e.target.value; save(); };
+$('#sSnooze').onchange = e => { S.set.snooze = +e.target.value; save(); };
+$('#sTest').onclick = () => { try { speechSynthesis.cancel(); } catch {} speak('Évangile de Jésus Christ selon saint Jean. Au commencement était le Verbe, et le Verbe était auprès de Dieu, et le Verbe était Dieu.'); };
+
+/* ---------- Commun ---------- */
+document.addEventListener('click', e => {
+  const p = e.target.closest('[data-play]');
+  if (p && p.dataset.play) { e.preventDefault(); togglePreview(p.dataset.play); }
+  const c = e.target.closest('[data-close]');
+  if (c) c.closest('dialog').close();
+});
+document.querySelectorAll('dialog').forEach(d => {
+  d.addEventListener('click', e => { if (e.target === d) d.close(); });
+  d.addEventListener('close', () => { if (!ringing) { stopSound(); try { speechSynthesis.cancel(); } catch {} } });
+});
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3200);
+}
+$('#add').onclick = () => openEditor(null);
+
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+let installEvt = null;
+if (!standalone) $('#install').hidden = false;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+$('#installBtn').onclick = () => {
+  if (installEvt) return installEvt.prompt();
+  $('#openSettings').click(); setTimeout(() => $('#howto').scrollIntoView({ block: 'start' }), 50);
+};
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+render(); loadToday(); tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

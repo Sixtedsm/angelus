@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Angélus : réveil à cloches dont les aiguilles forment une croix latine ; le pivot est au croisement. -->
+  <rect width="512" height="512" fill="#1E4B39"/>
+  <g transform="translate(256 264) scale(.8)">
+    <g fill="none" stroke="#fff">
+      <circle r="165" stroke-width="28"/>
+      <path d="M-118 130-146 172M118 130 146 172" stroke-width="26" stroke-linecap="round"/>
+      <path d="M0-84V122M-82 0H82" stroke-width="30"/>
+    </g>
+    <g fill="#fff">
+      <path d="M-62-192A62 62 0 0 1 62-192Z" transform="rotate(-42)"/>
+      <path d="M-62-192A62 62 0 0 1 62-192Z" transform="rotate(42)"/>
+    </g>
+    <circle r="9" fill="#1E4B39"/>
+  </g>
+</svg>
